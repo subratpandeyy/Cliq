@@ -14,7 +14,7 @@ const LoginForm = () => {
   return (
     <div className="flex flex-col gap-6 justify-center items-center">
         <div className="flex flex-col items-center justify-center space-y-4">
-            <Image src={"/login.svg"} alt="login" height={500} width={500} />
+            <Image src={"/login.svg"} alt="login" height={400} width={400} />
             <h1 className="text-6xl font-extrabold text-indigo-400">Welcome Back to Cliq!</h1>
             <p className="text-base font-medium text-zinc-400">Login to your account</p>
         </div>
