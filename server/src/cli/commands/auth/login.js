@@ -18,8 +18,8 @@ dotenv.config();
 
 const URL = "http://localhost:3005";
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
-const CONFIG_DIR = path.join(os.homedir(), ".better-auth");
-const TOKEN_FILE = path.join(CONFIG_DIR, "token.json");
+export const CONFIG_DIR = path.join(os.homedir(), ".better-auth");
+export const TOKEN_FILE = path.join(CONFIG_DIR, "token.json");
 
 export async function loginAction(opts) {
     const options = z.object({
@@ -101,10 +101,83 @@ export async function loginAction(opts) {
                     expires_in/60
                 )} minutes)...`
             )
-         )
+         );
+
+         const token = await pollForToken({
+            authClient,
+            device_code,
+            clientId,
+            interval
+         })
     } catch (error) {
         
     }
+}
+
+async function pollForToken(authClient, deviceCode, clientId, initialInterval) {
+    let pollingInterval = initialInterval
+    const spinner = yoctoSpinner({ text: "", color: "cyan" });
+    let dots = 0;
+
+    return new Promise(( resolve, reject ) => {
+        const poll = async () => {
+            dots = (dots+1)%4;
+            spinner.text = chalk.gray(
+                `Polling for authorization${".".repeat(dots)}${" ".repeat(3-dots)}`
+            );
+            if(!spinner.isSpinning) spinner.start();
+
+            try {
+                const { data, error } = await authClient.device.token({
+                    grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+                    device_code: deviceCode,
+                    clientId: clientId,
+                    fetchOptions: {
+                        header: {
+                            "user-agent": `My CLI`
+                        }
+                    }
+                });
+
+                if(data?.access_token) {
+                    console.log(
+                        chalk.bold.yellow(`Your access token: ${data.access_token}`)
+                    );
+
+                    spinner.stop();
+                    resolve(data);
+                    return;
+                }
+                else if(error) {
+                    switch(error.error) {
+                        case "authorization_pending":
+                            break;
+                        case "slow_down":
+                            pollingInterval += 5;
+                            break;
+                        case "access_denied":
+                            console.error("Access was denied by the user");
+                            return;
+                        case "expired_token":
+                            console.error("The device code has expired. Please try again.");
+                            return;
+                        default:
+                            spinner.stop();
+                            logger.error(`Error: ${error.error_description}`);
+                            process.exit(1);
+                    }
+                }
+            }
+            catch(err) {
+                spinner.stop();
+                logger.error(`Error: ${error.error_description}`);
+                process.exit(1);
+            }
+
+            setTimeout(poll, pollingInterval * 1000);
+        }
+        setTimeout(poll, pollingInterval * 1000);
+    })
 }
 
 // Commander Login
