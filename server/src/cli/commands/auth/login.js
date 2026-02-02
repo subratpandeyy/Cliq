@@ -13,6 +13,7 @@ import yoctoSpinner from "yocto-spinner";
 import * as z from "zod";
 import dotenv from "dotenv";
 import prisma from "../../../lib/db.js";
+import { getStoredToken, isTokenExpired, storeToken } from "../../../lib/token.js";
 
 dotenv.config();
 
@@ -33,8 +34,8 @@ export async function loginAction(opts) {
     intro(chalk.bold("Auth CLI Login"));
 
     // TODO: Change this with token mgmt utils
-    const existingToken = false;
-    const expired = false;
+    const existingToken = await getStoredToken();
+    const expired = isTokenExpired();
 
     if(existingToken && !expired) {
         const shouldReAuth = await confirm({
@@ -103,14 +104,33 @@ export async function loginAction(opts) {
             )
          );
 
-         const token = await pollForToken({
+         const token = await pollForToken(
             authClient,
             device_code,
             clientId,
             interval
-         })
+         )
+         if(token) {
+            const saved = await storeToken();
+
+            if(!saved) {
+                console.log(
+                    chalk.yellow("Warning: Could not save authentication token")
+                );
+                console.log(
+                    chalk.yellow("You may need to login again before using again.")
+                );
+            }
+         }
+
+         outro(chalk.green("Login success!"));
+         console.log(chalk.gray(`\nToken saved to: ${TOKEN_FILE}`));
+         console.log(chalk.gray("You can use AI features without logging again."));
+        //  todo: get the user data
     } catch (error) {
-        
+        spinner.stop();
+        console.log(chalk.red("Login Failed:", error.message));
+        process.exit(1);
     }
 }
 
