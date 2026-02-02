@@ -2,6 +2,8 @@ import { cancel, confirm, intro, isCancel, outro } from "@clack/prompts";
 import { logger } from "better-auth";
 import { createAuthClient } from "better-auth/client";
 import { deviceAuthorizationClient } from "better-auth/client/plugins";
+import dotenv from "dotenv";
+dotenv.config();
 
 import chalk from "chalk";
 import { Command } from "commander";
@@ -11,11 +13,9 @@ import os from "os";
 import path from "path";
 import yoctoSpinner from "yocto-spinner";
 import * as z from "zod";
-import dotenv from "dotenv";
+
 import prisma from "../../../lib/db.js";
 import { getStoredToken, isTokenExpired, storeToken } from "../../../lib/token.js";
-
-dotenv.config();
 
 const URL = "http://localhost:3005";
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
@@ -26,7 +26,8 @@ export async function loginAction(opts) {
     const options = z.object({
         serverUrl: z.string().optional(),
         clientId: z.string().optional()
-    });
+    })
+    .parse(opts);
 
     const serverUrl = options.serverUrl || URL;
     const clientId = options.clientId || CLIENT_ID;
@@ -52,7 +53,7 @@ export async function loginAction(opts) {
     const authClient = createAuthClient({
         baseURL: serverUrl,
         plugins: [deviceAuthorizationClient()]
-    })
+    });
 
     const spinner = yoctoSpinner({ text: "Requesting device authorization..." });
     spinner.start();
@@ -111,7 +112,7 @@ export async function loginAction(opts) {
             interval
          )
          if(token) {
-            const saved = await storeToken();
+            const saved = await storeToken(token);
 
             if(!saved) {
                 console.log(
@@ -151,9 +152,9 @@ async function pollForToken(authClient, deviceCode, clientId, initialInterval) {
                 const { data, error } = await authClient.device.token({
                     grant_type: "urn:ietf:params:oauth:grant-type:device_code",
                     device_code: deviceCode,
-                    clientId: clientId,
+                    client_id: clientId,
                     fetchOptions: {
-                        header: {
+                        headers: {
                             "user-agent": `My CLI`
                         }
                     }
@@ -190,7 +191,7 @@ async function pollForToken(authClient, deviceCode, clientId, initialInterval) {
             }
             catch(err) {
                 spinner.stop();
-                logger.error(`Error: ${error.error_description}`);
+                logger.error(`Error: ${err.error_description}`);
                 process.exit(1);
             }
 
