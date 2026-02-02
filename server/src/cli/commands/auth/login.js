@@ -93,7 +93,7 @@ export async function loginAction(opts) {
          })
 
          if(!isCancel(shouldOpen) && shouldOpen) {
-            const urlToOpen = verification_uri || verification_uri_complete
+            const urlToOpen = verification_uri_complete || verification_uri
             await open(urlToOpen)
          }
 
